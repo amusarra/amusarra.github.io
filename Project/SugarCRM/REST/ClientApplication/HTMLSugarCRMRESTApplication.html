@@ -215,6 +215,7 @@
 			               },
 						error: function(jqXHR, textStatus, errorThrown) {
 							$("#accordionLoginResult").html("<span class='error-message'>Errors occurred during the call to service.</span>");
+							sugarcrmSessionId = null;
 						},
 						complete: function() {
 							$("#accordion").show();
