@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="author" content="Antonio Musarra">
+		<title>An example of an HTML application with SugarCRM REST API</title>
+		<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.4/themes/smoothness/jquery-ui.css">
+		<link rel="stylesheet" href="http://jqueryui.com/resources/demos/style.css">
+		<!-- Latest compiled and minified CSS -->
+		<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+		<!-- Optional theme -->
+		<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap-theme.min.css">
+		<!-- Latest compiled and minified JavaScript -->
+		<script src="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
+		<!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+		<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+		<!--[if lt IE 9]>
+		<script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+		<script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+		<![endif]-->
+		<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+		<script src="http://code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+		<script src="http://code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
+		<style>
+			body {
+			font-size: 12px;
+			}
+			#accordion {
+			width: 50%;
+			border:solid 1px #2d2d2d;
+			background:rgb(64, 57, 132);
+			margin: 10px;
+			padding:10px 10px 10px 10px;
+			-moz-border-radius: 5px;
+			-webkit-border-radius: 5px;
+			border-radius: 5px;
+			-moz-box-shadow:10px  10px 5px #000000;
+			-webkit-box-shadow:10px  10px 5px #000000;
+			box-shadow:10px  10px 5px #000000;
+			}
+			#serverInfoContainer span {
+			display: block;
+			}
+			.ui-accordion-content.ui-helper-reset.ui-widget-content.ui-corner-bottom.ui-accordion-content-active {
+			height: auto!important;
+			}
+			.success-message {
+			color: green;
+			font-weight: bold;
+			font-size: 10px;
+			}
+			.error-message {
+			color: red;
+			font-weight: bold;
+			font-size: 10px;
+			}
+		</style>
+	</head>
+	<body role="document">
+		<div class="container theme-showcase">
+			<div class="header">
+				<ul class="nav nav-pills pull-right">
+					<li class="active"><a href="http://www.dontesta.it/blog">Home</a></li>
+					<li><a href="http://www.sugarcrm.com">Go SugarCRM</a></li>
+					<li><a href="http://www.dontesta.it/blog/recent-work/">Go SugarCRM PostgreSQL</a></li>
+				</ul>
+				<h3 class="text-muted">Antonio Musarra's Blog</h3>
+			</div>
+			<header>
+				<h1>A SugarCRM REST API application</h1>
+			</header>
+			<section>
+				<article class="jumbotron">
+					<h2>An example of an HTML application with SugarCRM REST API.</h2>
+					<h3>SugarCRM Service Info</h3>
+					<div id="serverInfoContainer">
+						<span id="sugarcrmApplicationURL">SugarCRM Application URL: #sugarcrmApplicationURL#</span>
+						<span id="sugarcrmServiceURL">SugarCRM Service URL: #sugarcrmServiceURL#</span>
+						<ul>
+							<li>User/Password => admin/admin</li>
+							<li>User/Password => will/will</li>
+						</ul>
+					</div>
+					<form action="http://sugarcrmpgsql-shiruslabs.rhcloud.com/service/v4_1/rest.php" method="post" id="sugarcrmLoginForm">
+						<label>Username:
+						<input id="username" placeholder="SugarCRM UserName" autofocus required>
+						</label>
+						<label>Password
+						<input type="password" id="password" placeholder="SugarCRM Password" autofocus required>
+						</label>
+						<input class="btn btn-xs btn-primary" type="reset"  value="Reset">
+						<input class="btn btn-xs btn-primary" type="submit" value="Login">
+					</form>
+					<div id="accordion">
+						<h3 data-operation="login">Login Result</h3>
+						<div id="accordionLoginResult">
+						</div>
+						<h3 data-operation="get-server-info">SugarCRM Server Info</h3>
+						<div id="accordionServerInfo">
+							<span>Loading... Please wait.</span>
+						</div>
+						<h3 data-operation="get-user-info">User Info</h3>
+						<div id="accordionUserInfo">
+							<span>Loading... Please wait.</span>
+						</div>
+						<h3 data-operation="get-upcoming-activities">My Upcoming Activities</h3>
+						<div id="accordionRecentlyViewedRecords">
+							<span>Loading... Please wait.</span>
+						</div>
+					</div>
+					<div id="loginResult">
+					</div>
+				</article>
+			</section>
+			<div class="footer">
+				<p>&copy; Antonio Musarra's Blog 2014</p>
+			</div>
+		</div>
+		<script>
+			var sugarcrmSessionId = null;
+			var sugarcrmUserId = null;
+			var sugarcrmServiceURL = $("#sugarcrmLoginForm").attr("action");
+			var sugarcrmURL = "http://sugarcrmpgsql-shiruslabs.rhcloud.com";
+			var waitMessage = "<span>Loading... Please wait.</span>";
+			
+			$("#sugarcrmApplicationURL").text($("#sugarcrmApplicationURL").text().replace("#sugarcrmApplicationURL#", sugarcrmURL));
+			$("#sugarcrmServiceURL").text($("#sugarcrmServiceURL").text().replace("#sugarcrmServiceURL#", sugarcrmServiceURL));
+			
+			$("#accordion").hide();
+			
+			   //hang on event of form with id=sugarcrmLoginForm
+			   $("#sugarcrmLoginForm").submit(function(e) {
+			       //prevent Default functionality
+			       e.preventDefault();
+			
+				//get the action-url of the form
+			       var actionurl = e.currentTarget.action;
+			
+				// prepare a data for submit
+				var loginParams = {
+					user_auth:{
+						user_name:$("#username").val(),
+						password:$("#password").val(),
+						encryption:"PLAIN"
+					},
+					application: "SugarCRM REST API"
+				};
+				var dataToPost = {
+					method: "login",
+					input_type: "JSON",
+					response_type: "JSON",
+					rest_data: JSON.stringify(loginParams)
+				};
+			
+			       //do your own request an handle the results
+			        $.ajax({
+			               url: actionurl,
+			               type: 'post',
+			               dataType: 'json',
+			               data: dataToPost,
+			               success: function(result) {
+							if(result.id) {
+								sugarcrmSessionId = result.id;
+								sugarcrmUserId = result.name_value_list.user_id.value;
+								$("#accordionLoginResult").html("<span class='success-message'>Sucessfully login. Your session ID is : " + result.id + "</span>");
+							} else {
+								$("#accordionLoginResult").html("Error on login. See details: <ul class='error-message'>"
+									+ "<li>Name: " + result.name + "</li>"
+									+ "<li>Number: " + result.number + "</li>"
+									+ "<li>Description: " + result.description + "</li>");
+							}
+			               },
+						error: function(jqXHR, textStatus, errorThrown) {
+							$("#accordionLoginResult").html("<span class='error-message'>Errors occurred during the call to service.</span>");
+						},
+						complete: function() {
+							$("#accordion").show();
+							$("#accordion").accordion("option","active",0);
+						}
+			           });
+			   });
+			
+			var getServerInfo = function() {
+				//get the action-url of the form
+			       var actionurl = sugarcrmServiceURL;
+			
+				var dataToPost = {
+					method: "get_server_info",
+					input_type: "JSON",
+					response_type: "JSON"
+				};
+			
+			       //do your own request an handle the results
+			       return $.ajax({
+			               url: actionurl,
+			               type: 'post',
+			               dataType: 'json',
+			               data: dataToPost
+			           });
+			};
+			
+			var getUserInfo = function() {
+				//get the action-url of the form
+			       var actionurl = sugarcrmServiceURL;
+			
+				// prepare a data for submit
+				var userInfoParams = {
+					session:sugarcrmSessionId,
+					module_name: "Users",
+					id: sugarcrmUserId
+				};
+			
+				var dataToPost = {
+					method: "get_entry",
+					input_type: "JSON",
+					response_type: "JSON",
+					rest_data: JSON.stringify(userInfoParams)
+				};
+			
+			       //do your own request an handle the results
+			       return $.ajax({
+			               url: actionurl,
+			               type: 'post',
+			               dataType: 'json',
+			               data: dataToPost
+			           });
+			};
+			
+			var getUpComingActivities = function() {
+				//get the action-url of the form
+			       var actionurl = sugarcrmServiceURL;
+			
+				// prepare a data for submit
+				var params = {
+					session:sugarcrmSessionId,
+				};
+			
+				var dataToPost = {
+					method: "get_upcoming_activities",
+					input_type: "JSON",
+					response_type: "JSON",
+					rest_data: JSON.stringify(params)
+				};
+			
+			       //do your own request an handle the results
+			       return $.ajax({
+			               url: actionurl,
+			               type: 'post',
+			               dataType: 'json',
+			               data: dataToPost
+			           });
+			};
+			
+			var getSeamlessLogin = function() {
+				//get the action-url of the form
+			       var actionurl = sugarcrmServiceURL;
+			
+				// prepare a data for submit
+				var params = {
+					session:sugarcrmSessionId,
+				};
+			
+				var dataToPost = {
+					method: "seamless_login",
+					input_type: "JSON",
+					response_type: "JSON",
+					rest_data: JSON.stringify(params)
+				};
+			
+			       //do your own request an handle the results
+			       return $.ajax({
+			               url: actionurl,
+			               type: 'post',
+			               dataType: 'json',
+			               data: dataToPost
+			           });
+			};
+			
+			$(function() {
+				$("#accordion").accordion({
+					activate: function (event, ui) {
+						var operation = $(ui.newHeader[0]).attr('data-operation');
+			
+						switch(operation)
+						{
+							case "get-server-info":
+								$(ui.newHeader[0]).next().html(waitMessage);
+								var startServiceCall = getServerInfo();
+								startServiceCall.success(function(result) {
+									var data = "<ul class='success-message'><li>Edition: " + result.flavor + "</li>"
+										+ "<li>Version: " + result.version + "</li>"
+										+ "<li>GMT Time: " + result.gmt_time + "</li>"
+										+ "</ul>";
+									$(ui.newHeader[0]).next().html(data);
+								});
+								startServiceCall.error(function(jqXHR, textStatus, errorThrown) {
+									var data = "<span class='error-message'>Errors occurred during the call to service.</span>";
+									$(ui.newHeader[0]).next().html(data);
+								});
+								break;
+							case "get-user-info":
+								$(ui.newHeader[0]).next().html(waitMessage);
+								var startServiceCall = getUserInfo();
+								startServiceCall.success(function(result) {
+									if(result != null && result.entry_list) {
+										var data = "<ul class='success-message'>"
+											+ "<li>Full Name: " + result.entry_list[0].name_value_list.full_name.value + "</li>"
+											+ "<li>User Name: " + result.entry_list[0].name_value_list.user_name.value + "</li>"
+											+ "<li>Date Entered: " + result.entry_list[0].name_value_list.date_entered.value + "</li>"
+											+ "<li>Status: " + result.entry_list[0].name_value_list.status.value + "</li>"
+											+ "<li>Email: " + result.entry_list[0].name_value_list.email1.value + "</li>"
+											+ "</ul>";
+									} else if(result != null && result.name) {
+										var data = "Error on login. See details: <ul class='error-message'>"
+											+ "<li>Name: " + result.name + "</li>"
+											+ "<li>Number: " + result.number + "</li>"
+											+ "<li>Description: " + result.description + "</li>";
+									} else {
+										var data = "<span class='error-message'>Errors occurred during the call to service.</span>";
+									}
+									$(ui.newHeader[0]).next().html(data);
+								});
+								startServiceCall.error(function(jqXHR, textStatus, errorThrown) {
+									var data = "<span class='error-message'>Errors occurred during the call to service.</span>";
+									$(ui.newHeader[0]).next().html(data);
+								});
+							  break;
+							case "get-upcoming-activities":
+								$(ui.newHeader[0]).next().html(waitMessage);
+								var startSeamlessLogin = getSeamlessLogin();
+								startSeamlessLogin.success(function(result) {
+									if(window.console)
+										console.log("Seam Less Login => " + result);
+								});
+								startSeamlessLogin.error(function(jqXHR, textStatus, errorThrown) {
+									if(window.console)
+										console.log("Errors occurred during the call to service Seam Less Login");
+								});
+			
+								var startServiceCall = getUpComingActivities();
+								startServiceCall.success(function(result) {
+									var data = "";
+									if(result != null && !result.name) {
+										$.each( result, function( key, value ) {
+											data += "<ul class='success-message'>"
+													+ "<li>"
+													+ value.module + " - " + value.date_due + " - " + value.summary
+													+ " - "
+													+ "<a href='"
+													+ sugarcrmURL + "/index.php?module=" + value.module + "&action=DetailView&MSID=" + sugarcrmSessionId + "&record=" + value.id + "'"
+													+ " target='_blank' title='View record detail'>Click for view record detail</a>"
+													+ "</li></ul>";
+										});
+									} else if(result != null && result.name) {
+										var data = "Error on login. See details: <ul class='error-message'>"
+											+ "<li>Name: " + result.name + "</li>"
+											+ "<li>Number: " + result.number + "</li>"
+											+ "<li>Description: " + result.description + "</li>";
+									} else {
+										var data = "<span class='error-message'>Errors occurred during the call to service.</span>";
+									}
+									$(ui.newHeader[0]).next().html(data);
+								});
+								startServiceCall.error(function(jqXHR, textStatus, errorThrown) {
+									var data = "<span class='error-message'>Errors occurred during the call to service.</span>";
+									$(ui.newHeader[0]).next().html(data);
+								});
+							  break;
+							default:
+							  if(window.console)
+								console.log("No action for this operation " + operation);
+						}
+					}
+				});
+			});
+		</script>
+	</body>
+</html>
